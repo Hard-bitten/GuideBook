@@ -2,12 +2,12 @@
 
 ##目录
 
--第一章 Linux基础知识 chapLinux.tex 秦杨、刘博
--第二章 C++编程基础 chapCpp.tex 许非凡
--第三章Robocup2d足球的入门 chapRobocup2d.tex 苏九贺
--第四章 Yushan底层开发手册 chapYushan.tex 刘凯旋
--第五章 模型库 chapModel.tex 徐涵彦
--第六章 参考资料 reference.tex 
+- 第一章 Linux基础知识 chapLinux.tex 
+- 第二章 C++编程基础 chapCpp.tex 
+- 第三章Robocup2d足球的入门 chapRobocup2d.tex 
+- 第四章 Yushan底层开发手册 chapYushan.tex 
+- 第五章 模型库 chapModel.tex 
+- 第六章 参考资料 reference.tex 
 
 ##PDF下载
 
