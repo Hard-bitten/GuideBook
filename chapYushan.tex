@@ -49,7 +49,7 @@ QT在编辑上的优势。。。。
 秋山教授在soccerwindow2中同样开发了将日志信息可视化的功能，让日志文件可以在soccerwindows中更直观的展示
 出来，方便开发者使用，使用方法如下：
 
-当然我们也可以针对自己的程序编写自己的日志记录，比如在调试一个小功能的时候，并不想调用庞大的底层中dlog，
+当然我们也可以针对自己的程序编写自己的日志记录，比如在调试一个小模型的时候，并不想调用庞大的底层中dlog，
 我们可以自己编写文件输入输出代码，来记录调试自己的功能。
 \subsubsection{动态调试}
 当然日志记录并不能解决所有的问题，比如，在我们在测试中出现了bug，需要复盘曾经出现过的现象，进行动态调整代码
@@ -156,205 +156,8 @@ PlayerAgent类的actionImpl() 是一个纯虚函数，所以我们从它的子�
 这里以一个简单的学习Helios2008边后卫和中后卫的防守运动为例子，讲解如何学习前人的模型。首先比较一下下面两个代码\footnote{由于篇幅限制已去掉注释,copyright by Helios} 。
 
 \begin{Codex}[label=bhv_side_back_defensive_move.cpp]
-bool
-Bhv_SideBackDefensiveMove::execute( PlayerAgent * agent )
-{
-	dlog.addText( Logger::ROLE,
-	__FILE__": Bhv_SideBackDefensiveMove" );
 
-	if ( Bhv_BasicTackle( 0.85, 50.0 ).execute( agent ) )
-	{
-		agent->debugClient().addMessage( "SB:Def:Tackle" );
-		return true;
-	}
-	
-	if ( doIntercept( agent ) )
-	{
-		return true;
-	}
-	
-	if ( doAttackBallOwner( agent ) )
-	{
-		dlog.addText( Logger::ROLE,
-		__FILE__": attack to ball owner" );
-		return true;
-	}
-	
-	if ( doEmergencyMove( agent ) )
-	{
-		return true;
-	}
-	
-	doNormalMove( agent );
-	return true;
-	
-}
-\end{Codex}
 
-\begin{Codex}[label=bhv_center_back_defensive_move.cpp]
-bool
-Bhv_CenterBackDefensiveMove::execute( PlayerAgent * agent )
-{
-	dlog.addText( Logger::TEAM,
-	__FILE__": Bhv_CenterBackDefensiveMove" );
-	
-	if ( Bhv_BasicTackle( 0.85, 50.0 ).execute( agent ) )
-	{
-		agent->debugClient().addMessage( "CB:Def:Tackle" );
-		return true;
-	}
-	
-	if ( doIntercept( agent ) )
-	{
-		return true;
-	}
-	
-	if ( doGetBall( agent ) )
-	{
-		return true;
-	}
-	
-	doNormalMove( agent );
-	return true;
-	
-}
-\end{Codex}
-
-比较这两个代码我们可以看到不同角色的球员策略大不相同。边后卫采取的是比较激进的策略，进行攻击对手和紧急补位；而中后卫采取的是getball的策略形成压制势力，防止对方突破。这里就可以看出一个模型只有用在一个正确的位置才能发挥其作用。这里面提到的几种防守的解决方案都是防守中可取的一些方法，下面对其攻击持球者的模型进行分析。
-
-\begin{Codex}[label=bhv_side_back_defensive_move.cpp]
-bool
-Bhv_SideBackDefensiveMove::doAttackBallOwner( rcsc::PlayerAgent * agent )
-{
-	const rcsc::WorldModel & wm = agent->world();
-	
-	const int mate_min = wm.interceptTable()->teammateReachCycle();
-	const int opp_min = wm.interceptTable()->opponentReachCycle();
-	
-	const AbstractPlayerObject * fastest_opp = wm.interceptTable()
-						->fastestOpponent();
-	
-	if ( mate_min < opp_min )
-	{
-		dlog.addText( Logger::ROLE,
-		__FILE__": doAttackBallOwner() ball owner is teammate" );
-		return false;
-	}
-	
-	if ( ! fastest_opp )
-	{
-		dlog.addText( Logger::ROLE,
-		__FILE__": doAttackBallOwner() no opponent" );
-		return false;
-	}
-	
-	const Vector2D opp_trap_pos = wm.ball().inertiaPoint( opp_min );
-	
-	const Vector2D home_pos = Strategy::i().getPosition( wm.self().unum() );
-	const PositionType position_type = Strategy::i().
-			getPositionType( wm.self().unum() );
-	
-	const MarkTable & mark_table = Strategy::i().markTable();
-	const AbstractPlayerObject * mark_target = 
-				mark_table.getTargetOf( wm.self().unum() );
-	const AbstractPlayerObject * free_attacker = 
-			static_cast< AbstractPlayerObject * >( 0 );
-	
-	if ( mark_target )
-	{
-		dlog.addText( Logger::ROLE,
-		__FILE__": doAttackBallOwner() mark_target= %d (%.1f %.1f)",
-		mark_target->unum(),
-		mark_target->pos().x, mark_target->pos().y );
-		
-		//
-		// find other free attacker
-		//
-		const AbstractPlayerCont::const_iterator o_end = wm.allOpponents().end();
-		for ( AbstractPlayerCont::const_iterator o = wm.allOpponents().begin();
-		o != o_end;
-		++o )
-		{
-			const AbstractPlayerObject * marker = mark_table.getMarkerOf( *o );
-			if ( marker ) continue; // exist other marker
-			if ( (*o)->pos().x > mark_target->pos().x + 10.0 ) 
-				continue; // no attacker
-			if ( ( position_type == Position_Left
-			&& (*o)->pos().y < mark_target->pos().y + 10.0 )
-			|| ( position_type == Position_Right
-			&& (*o)->pos().y > mark_target->pos().y - 10.0 )
-			|| ( position_type == Position_Center
-			&& std::fabs( (*o)->pos().y - mark_target->pos().y ) < 10.0 )
-			)
-			{
-				free_attacker = *o;
-				break;
-			}
-		}
-	}
-	
-	if ( free_attacker )
-	{
-		dlog.addText( Logger::ROLE,
-		__FILE__": doAttackBallOwner() exist free_ataccker= %d (%.1f %.1f)",
-		free_attacker->unum(),
-		free_attacker->pos().x, free_attacker->pos().y );
-	}
-
-	const double min_y = ( position_type == Position_Right
-	? 2.0
-	: -31.5 );
-	const double max_y = ( position_type == Position_Left
-	? -2.0
-	: +31.5 );
-	
-	if ( fastest_opp == mark_target )
-	{
-		dlog.addText( Logger::ROLE,
-		__FILE__": doAttackBallOwner() fastest_opp == mark_target, %d (%.1f %.1f) trap_pos=(%.1f %.1f)",
-		mark_target->unum(),
-		mark_target->pos().x, mark_target->pos().y,
-		opp_trap_pos.x, opp_trap_pos.y );
-		Rect2D bounding_rect( Vector2D( -50.0, min_y ),
-		Vector2D( -5.0, max_y ) );
-		if ( Bhv_GetBall( bounding_rect ).execute( agent ) )
-		{
-			agent->debugClient().addMessage( "SB:Def:GetBall(1)" );
-			return true;
-		}
-	}
-
-	if ( ! mark_target )
-	{
-		dlog.addText( Logger::ROLE,
-		__FILE__": doAttackBallOwner() no mark target.
-		 ball_owner=%d (%.1f %.1f) trap_pos=(%.1f %.1f)",
-		fastest_opp->unum(),
-		fastest_opp->pos().x, fastest_opp->pos().y,
-		opp_trap_pos.x, opp_trap_pos.y );
-		
-		if ( opp_trap_pos.x < home_pos.x + 10.0
-		&& ( std::fabs( opp_trap_pos.y - home_pos.y ) < 10.0
-		|| ( position_type == Position_Left
-		&& opp_trap_pos.y < home_pos.y )
-		|| ( position_type == Position_Right
-		&& opp_trap_pos.y > home_pos.y ) )
-		)
-		{
-			dlog.addText( Logger::ROLE,
-			__FILE__": doAttackBallOwner() no mark target. attack " );
-			Rect2D bounding_rect( Vector2D( -50.0, min_y ),
-			Vector2D( -5.0, max_y ) );
-			if ( Bhv_GetBall( bounding_rect ).execute( agent ) )
-			{
-				agent->debugClient().addMessage( "SB:Def:GetBall(2)" );
-				return true;
-			}
-		}
-	}
-	
-	return false;
-}
 \end{Codex}
 这个代码的条例非常清晰，首先进行盯人对象的选择，然后对盯人对象的分析，如果球员是最快的球员，就要去getball；同样是使用getball，边后卫的getball就目的性更明确，成功率增高了。
 \subsection{优秀编码习惯}
@@ -742,55 +545,7 @@ doPointto( const double & x, const double & y);
 该命令让球员指向某一个点，因为可以直接在比赛监视器中看到指向的动作，所以该方法在策略的测试的时候经常用到，使用方法agent->doPointto(x,y)，其中x,y分别代表一个点的x坐标和y坐标。 
 
 
-\subsection{截球动作}
 
-SelfInterceptV13 	生成一系列的截球信息。
-
-PlayerIntercept 	该文件主要是对预测 turn 和 dash 的周期。
-
-Body_Intercept 		该文件为截球执行对外的接口
-
-\subsubsection{InterceptTable}
-与 World_Model 同时进行更新,下面例举几个关键函数:
-\begin{itemize}
-\item void createBallCache() 生成一个容器存放球在未来几个周期内每个周期的位置。
-\item void predictSelf() 调用 self_intercept_v13 生成 self 截球信息表,并且更新 M_self_reach_cycle 和 M_self_exhaust_reach_cycle。
-\item void predictTeammate() 调用 player_intercept,主要对 M_fastest_teammate 和 M_second_teammate。
-\item void predictOpponent() 调用 player_intercept,主要对 M_fastest_opponent 和 M_second_opponent。
-\end{itemize}
-
-
-
-\subsubsection{SelfInterceptV13}
-该文件主要根据当前的WorldModel信息以及之前createBallCache生成的球的信息,生成一系列的截球信息放在容器中。分成三个步骤生成截球信息表,即 predictOneStep/predictShortStep/predictLongStep。
-
-在predictOneStep中,分为noDash和oneDash两部分,noDash只进行转身,oneDash进行一步dash,没有转身动作。
-
-在predictShortStep中,reachCycle从2开始进行搜索,每次搜索首先建立一个临时容器存放该cycle中产生的截球信息,截球信息根据距离以及dash方向分成5种情况生成;然后从临时容器中选择最佳的截球信息放入截球信息表中,筛选原则依次是
-
-\begin{enumerate}
-	\item 球最后的位置是否在安全距离内	
-	\item 转身周期(turnCycle)
-	\item 体能
-\end{enumerate}
-
-
-当不满足条件时,跳出搜索循环。
-
-在 predictOneStep中,从start_cycle开始进行搜索,如同ShortStep也需要建立一个临时容器存放截球信息,加入截球信息时需要考虑 turn和 dash 后球能否 reach。如果最终截球信息表中位空,则预测球最后的位置加入截球信息。
-
-
-\subsubsection{Body_Intercept}
-该文件为截球执行对外的接口,可以分为两部分,一部分是截球表的评估,选择最优截球;另外一部分是截球动作的执行,截球表生成之后会有一个排序,根据 reachCycle 和 turnCycle 来进行排序。
-
-首先介绍对截球表的评估。
-
-评估从4个方面着手,attacker_best/forward_best/noturn_best/nearest_best(守门员从goalie_best/goalie_arggressive_best 两方面),在球速大于 2,球的 x 坐标大于 35 等条件下,从 attacker 方面对截球表进行评估打分,找出分值最高的即为 attacker_best。截球表中截球信息的turnCycle 等于 0 时,从 noturn 进行评估打分,分值即为 reachCycle,找出需要最少周期的为 noturn_best。当自己的截球周期与对方最快截球队员相差小于 5 时,利用 forward 进行评估,打分从距离等方面入手,找出分值最高的为 forward_best。nearest_best 以自己与球的距离来进行评估,最近的即为 nearest_best。上面是从四个方面分别对截球表信息进行评估选择,可能会出现四个方面都存在的现象,需要对其在进行综合评估。
-
-
-再次评估时,直接对 attacker_best/forward_best/noturn_best/nearest_best 进行判断。如果 attacker_best 存在,则优先返回 attacker_best;如果 noturn_best 和 forward_best 同时存在,需要再细化考虑,有条件下返回 noturn_best;如果不满足前面的条件,forward_best 存在的话则返回 forward_best。如果 noturn_best 和 nearest_best 同时存在,再根据具体条件判断进行选择 noturn_best 或 nearest_best。然后依次判断 noturn_best 和 nearest_best。如果条件都不满足,则返回截球表第一项。
-
-筛选出最优截球后,根据截球信息选择执行动作。如果 dashCycle 等于 0,执行转身动作;如果 dashCycle 大于 0,dashPower 小于 0 时,执行转身动作;当 turnCycle 和 reachCycle 都为 1 时,执行转身动作;体能不足时执行转身动作;上述条件不满足时执行 doInertiaDash,包括转身和 dash 动作。
 
 
 \subsection{常用函数}
@@ -885,6 +640,55 @@ double kickable2 = std::pow( wm.self().playerType().kickableArea()
 \end{Code}
 
 \end{enumerate}
+\subsection{截球动作}
+
+SelfInterceptV13 	生成一系列的截球信息。
+
+PlayerIntercept 	该文件主要是对预测 turn 和 dash 的周期。
+
+Body_Intercept 		该文件为截球执行对外的接口
+
+\subsubsection{InterceptTable}
+与 World_Model 同时进行更新,下面例举几个关键函数:
+\begin{itemize}
+	\item void createBallCache() 生成一个容器存放球在未来几个周期内每个周期的位置。
+	\item void predictSelf() 调用 self_intercept_v13 生成 self 截球信息表,并且更新 M_self_reach_cycle 和 M_self_exhaust_reach_cycle。
+	\item void predictTeammate() 调用 player_intercept,主要对 M_fastest_teammate 和 M_second_teammate。
+	\item void predictOpponent() 调用 player_intercept,主要对 M_fastest_opponent 和 M_second_opponent。
+\end{itemize}
+
+
+
+\subsubsection{SelfInterceptV13}
+该文件主要根据当前的WorldModel信息以及之前createBallCache生成的球的信息,生成一系列的截球信息放在容器中。分成三个步骤生成截球信息表,即 predictOneStep/predictShortStep/predictLongStep。
+
+在predictOneStep中,分为noDash和oneDash两部分,noDash只进行转身,oneDash进行一步dash,没有转身动作。
+
+在predictShortStep中,reachCycle从2开始进行搜索,每次搜索首先建立一个临时容器存放该cycle中产生的截球信息,截球信息根据距离以及dash方向分成5种情况生成;然后从临时容器中选择最佳的截球信息放入截球信息表中,筛选原则依次是
+
+\begin{enumerate}
+	\item 球最后的位置是否在安全距离内	
+	\item 转身周期(turnCycle)
+	\item 体能
+\end{enumerate}
+
+
+当不满足条件时,跳出搜索循环。
+
+在 predictOneStep中,从start_cycle开始进行搜索,如同ShortStep也需要建立一个临时容器存放截球信息,加入截球信息时需要考虑 turn和 dash 后球能否 reach。如果最终截球信息表中位空,则预测球最后的位置加入截球信息。
+
+
+\subsubsection{Body_Intercept}
+该文件为截球执行对外的接口,可以分为两部分,一部分是截球表的评估,选择最优截球;另外一部分是截球动作的执行,截球表生成之后会有一个排序,根据 reachCycle 和 turnCycle 来进行排序。
+
+首先介绍对截球表的评估。
+
+评估从4个方面着手,attacker_best/forward_best/noturn_best/nearest_best(守门员从goalie_best/goalie_arggressive_best 两方面),在球速大于 2,球的 x 坐标大于 35 等条件下,从 attacker 方面对截球表进行评估打分,找出分值最高的即为 attacker_best。截球表中截球信息的turnCycle 等于 0 时,从 noturn 进行评估打分,分值即为 reachCycle,找出需要最少周期的为 noturn_best。当自己的截球周期与对方最快截球队员相差小于 5 时,利用 forward 进行评估,打分从距离等方面入手,找出分值最高的为 forward_best。nearest_best 以自己与球的距离来进行评估,最近的即为 nearest_best。上面是从四个方面分别对截球表信息进行评估选择,可能会出现四个方面都存在的现象,需要对其在进行综合评估。
+
+
+再次评估时,直接对 attacker_best/forward_best/noturn_best/nearest_best 进行判断。如果 attacker_best 存在,则优先返回 attacker_best;如果 noturn_best 和 forward_best 同时存在,需要再细化考虑,有条件下返回 noturn_best;如果不满足前面的条件,forward_best 存在的话则返回 forward_best。如果 noturn_best 和 nearest_best 同时存在,再根据具体条件判断进行选择 noturn_best 或 nearest_best。然后依次判断 noturn_best 和 nearest_best。如果条件都不满足,则返回截球表第一项。
+
+筛选出最优截球后,根据截球信息选择执行动作。如果 dashCycle 等于 0,执行转身动作;如果 dashCycle 大于 0,dashPower 小于 0 时,执行转身动作;当 turnCycle 和 reachCycle 都为 1 时,执行转身动作;体能不足时执行转身动作;上述条件不满足时执行 doInertiaDash,包括转身和 dash 动作。
 \section{UML For Librcsc}
 
 \section{几个模型的实例开发}

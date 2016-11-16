@@ -4,15 +4,26 @@
 
 - 第一章 Linux基础知识 chapLinux.tex 
 - 第二章 C++编程基础 chapCpp.tex 
-- 第三章Robocup2d足球的入门 chapRobocup2d.tex 
+- 第三章 Robocup2d足球的入门 chapRobocup2d.tex 
 - 第四章 Yushan底层开发手册 chapYushan.tex 
 - 第五章 模型库 chapModel.tex 
 - 第六章 参考资料 reference.tex 
 
-##PDF下载
+##TODO LIST
 
-##特别鸣谢
-**本书使用Latex排版，使用的是XXX的模板。**
+- QT使用
+- 日志分析
+- 动态调试
+- 模型学习
+- 常用函数
+
+##PDF下载
+[下载](https://github.com/Hard-bitten/GuideBook/releases/)
+
+##LaTeX模板
+本书使用的是陈硕开源的[模板](https://github.com/chenshuo/typeset)。该模板已经用于陈硕写的书[《Linux 多线程服务端编程：使用 muduo C++ 网络库》](http://chenshuo.com/book/)，已经出版。
+
+这个模板制作精良，很有taste，感谢陈硕 :)
 
 ---------
 
